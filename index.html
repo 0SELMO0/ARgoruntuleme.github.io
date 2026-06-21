@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AR Deneyimi</title>
+  <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg: #050508;
+      --surface: #0e0e14;
+      --border: rgba(255,255,255,0.08);
+      --accent: #6c5ef6;
+      --accent2: #a78bfa;
+      --text: #f0eeff;
+      --muted: rgba(240,238,255,0.45);
+      --card-bg: rgba(255,255,255,0.04);
+      --glass-bg: rgba(14,14,20,0.75);
+      --glass-border: rgba(167,139,250,0.15);
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      overflow-x: hidden;
+    }
+
+    /* ─────────────────────────────
+       LANDING SCREEN
+    ───────────────────────────── */
+    #landing {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: var(--bg);
+      transition: opacity 0.7s ease, transform 0.7s ease;
+    }
+    #landing.hidden {
+      opacity: 0;
+      pointer-events: none;
+      transform: scale(1.04);
+    }
+
+    .orb {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(80px);
+      opacity: 0.25;
+      pointer-events: none;
+    }
+    .orb-1 { width: 500px; height: 500px; background: var(--accent); top: -100px; right: -100px; }
+    .orb-2 { width: 400px; height: 400px; background: #1e88e5; bottom: -80px; left: -80px; }
+
+    .landing-inner {
+      position: relative;
+      z-index: 1;
+      text-align: center;
+      padding: 2rem;
+      max-width: 600px;
+    }
+
+    .badge {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--accent2);
+      border: 1px solid rgba(167,139,250,0.3);
+      padding: 5px 14px;
+      border-radius: 100px;
+      margin-bottom: 2rem;
+    }
+
+    .landing-title {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: clamp(2.5rem, 8vw, 4.5rem);
+      font-weight: 700;
+      line-height: 1.08;
+      letter-spacing: -0.03em;
+      margin-bottom: 1.25rem;
+    }
+    .landing-title span {
+      background: linear-gradient(135deg, #a78bfa, #6c5ef6, #38bdf8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .landing-sub {
+      font-size: 1rem;
+      color: var(--muted);
+      line-height: 1.7;
+      max-width: 420px;
+      margin: 0 auto 2.5rem;
+    }
+
+    .enter-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--accent);
+      color: #fff;
+      font-family: 'Inter', sans-serif;
+      font-size: 0.9rem;
+      font-weight: 500;
+      padding: 14px 32px;
+      border: none;
+      border-radius: 100px;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+      box-shadow: 0 0 40px rgba(108,94,246,0.4);
+    }
+    .enter-btn:hover { transform: translateY(-2px); box-shadow: 0 0 60px rgba(108,94,246,0.6); }
+    .enter-btn svg { width: 18px; height: 18px; }
+
+    .stats {
+      display: flex;
+      gap: 2.5rem;
+      justify-content: center;
+      margin-top: 3rem;
+    }
+    .stat { text-align: center; }
+    .stat-num {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 1.6rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .stat-label { font-size: 0.75rem; color: var(--muted); margin-top: 2px; }
+
+    /* ─────────────────────────────
+       VIEWER SCREEN
+    ───────────────────────────── */
+    #viewer-screen {
+      position: fixed;
+      inset: 0;
+      z-index: 50;
+      display: flex;
+      flex-direction: column;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.7s ease;
+    }
+    #viewer-screen.visible {
+      opacity: 1;
+      pointer-events: all;
+    }
+
+    .topbar {
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      z-index: 20;
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: linear-gradient(to bottom, rgba(5,5,8,0.9) 0%, transparent 100%);
+    }
+
+    .logo-text {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 1.1rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+    .logo-text span { color: var(--accent2); }
+
+    .topbar-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .back-btn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      font-family: 'Inter', sans-serif;
+      font-size: 0.8rem;
+      padding: 7px 14px;
+      border-radius: 100px;
+      cursor: pointer;
+      transition: color 0.2s, border-color 0.2s;
+    }
+    .back-btn:hover { color: var(--text); border-color: rgba(255,255,255,0.2); }
+    .back-btn svg { width: 14px; height: 14px; }
+
+    model-viewer {
+      width: 100%;
+      height: 100%;
+      background: radial-gradient(ellipse at 60% 40%, rgba(108,94,246,0.12) 0%, var(--bg) 70%);
+    }
+
+    .controls {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      padding: 20px 24px 32px;
+      background: linear-gradient(to top, rgba(5,5,8,0.95) 0%, transparent 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+      z-index: 10;
+    }
+
+    .tip {
+      font-size: 0.78rem;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .tip svg { width: 14px; height: 14px; opacity: 0.6; }
+
+    .btn-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .ctrl-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      font-size: 0.82rem;
+      font-weight: 500;
+      padding: 10px 18px;
+      border-radius: 100px;
+      cursor: pointer;
+      transition: background 0.2s, border-color 0.2s;
+    }
+    .ctrl-btn:hover { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.18); }
+    .ctrl-btn.primary {
+      background: var(--accent);
+      border-color: transparent;
+      box-shadow: 0 0 24px rgba(108,94,246,0.4);
+    }
+    .ctrl-btn.primary:hover { background: #7c6ef8; }
+    .ctrl-btn svg { width: 15px; height: 15px; }
+
+    #sound-indicator {
+      position: absolute;
+      top: 68px;
+      right: 24px;
+      display: none;
+      align-items: center;
+      gap: 6px;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 100px;
+      padding: 6px 12px;
+      font-size: 0.75rem;
+      color: var(--accent2);
+      z-index: 20;
+    }
+    #sound-indicator.active { display: flex; }
+    .pulse {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--accent2);
+      animation: pulse-anim 1.2s infinite;
+    }
+    @keyframes pulse-anim {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.7); }
+    }
+
+    /* ─────────────────────────────
+       SETTINGS TOGGLE BUTTON
+    ───────────────────────────── */
+    #settings-toggle {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 36px;
+      height: 36px;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 50%;
+      cursor: pointer;
+      transition: background 0.2s, border-color 0.2s, transform 0.4s;
+      color: var(--muted);
+    }
+    #settings-toggle:hover {
+      background: rgba(255,255,255,0.08);
+      border-color: var(--glass-border);
+      color: var(--text);
+    }
+    #settings-toggle.open {
+      transform: rotate(90deg);
+      border-color: var(--accent2);
+      color: var(--accent2);
+      background: rgba(167,139,250,0.08);
+    }
+    #settings-toggle svg { width: 16px; height: 16px; }
+
+    /* ─────────────────────────────
+       SETTINGS PANEL (glassmorphism)
+    ───────────────────────────── */
+    #settings-panel {
+      position: absolute;
+      top: 64px;
+      right: 24px;
+      z-index: 30;
+      width: 300px;
+      background: var(--glass-bg);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border: 1px solid var(--glass-border);
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.5), 0 0 0 1px rgba(167,139,250,0.05) inset;
+
+      /* hidden by default */
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(-8px) scale(0.97);
+      transform-origin: top right;
+      transition: opacity 0.25s ease, transform 0.25s ease;
+    }
+    #settings-panel.open {
+      opacity: 1;
+      pointer-events: all;
+      transform: translateY(0) scale(1);
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 18px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--border);
+    }
+    .panel-header-icon {
+      width: 30px; height: 30px;
+      background: linear-gradient(135deg, rgba(108,94,246,0.3), rgba(56,189,248,0.15));
+      border: 1px solid rgba(167,139,250,0.25);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .panel-header-icon svg { width: 14px; height: 14px; color: var(--accent2); }
+    .panel-title {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .panel-subtitle {
+      font-size: 0.7rem;
+      color: var(--muted);
+    }
+
+    /* File upload rows */
+    .upload-row {
+      margin-bottom: 14px;
+    }
+    .upload-label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.72rem;
+      font-weight: 500;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 7px;
+    }
+    .upload-label svg { width: 12px; height: 12px; }
+
+    .upload-zone {
+      position: relative;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: rgba(255,255,255,0.03);
+      border: 1px dashed rgba(167,139,250,0.2);
+      border-radius: 10px;
+      padding: 10px 12px;
+      cursor: pointer;
+      transition: background 0.2s, border-color 0.2s;
+      overflow: hidden;
+    }
+    .upload-zone:hover {
+      background: rgba(108,94,246,0.08);
+      border-color: rgba(167,139,250,0.45);
+    }
+    .upload-zone.loaded {
+      border-style: solid;
+      border-color: rgba(167,139,250,0.4);
+      background: rgba(108,94,246,0.06);
+    }
+    .upload-zone input[type="file"] {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+      width: 100%;
+      height: 100%;
+    }
+
+    .upload-icon {
+      width: 32px; height: 32px;
+      flex-shrink: 0;
+      background: rgba(167,139,250,0.1);
+      border: 1px solid rgba(167,139,250,0.2);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .upload-icon svg { width: 14px; height: 14px; color: var(--accent2); }
+
+    .upload-text { flex: 1; min-width: 0; }
+    .upload-text-main {
+      font-size: 0.78rem;
+      font-weight: 500;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .upload-text-sub {
+      font-size: 0.68rem;
+      color: var(--muted);
+      margin-top: 1px;
+    }
+
+    .upload-check {
+      width: 18px; height: 18px;
+      flex-shrink: 0;
+      background: rgba(52,211,153,0.15);
+      border: 1px solid rgba(52,211,153,0.3);
+      border-radius: 50%;
+      display: none;
+      align-items: center; justify-content: center;
+    }
+    .upload-check svg { width: 10px; height: 10px; color: #34d399; }
+    .upload-zone.loaded .upload-check { display: flex; }
+
+    .panel-divider {
+      height: 1px;
+      background: var(--border);
+      margin: 14px 0;
+    }
+
+    /* Status chips */
+    .status-row {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .status-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 0.68rem;
+      padding: 4px 9px;
+      border-radius: 100px;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      background: var(--card-bg);
+    }
+    .status-chip.ok {
+      color: #34d399;
+      border-color: rgba(52,211,153,0.25);
+      background: rgba(52,211,153,0.06);
+    }
+    .status-chip.warn {
+      color: #fbbf24;
+      border-color: rgba(251,191,36,0.25);
+      background: rgba(251,191,36,0.06);
+    }
+    .status-chip .dot {
+      width: 5px; height: 5px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    @media (max-width: 480px) {
+      .stats { gap: 1.5rem; }
+      #settings-panel { right: 12px; width: calc(100vw - 24px); }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ══════════════════════════════
+     LANDING
+══════════════════════════════ -->
+<div id="landing">
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="landing-inner">
+    <div class="badge">Artırılmış Gerçeklik Deneyimi</div>
+    <h1 class="landing-title">Gerçekliği <span>Yeniden Tanımla</span></h1>
+    <p class="landing-sub">3D karakterinizi fiziksel dünyanıza yerleştirin. Mobil cihazınızla kamerayı açın ve deneyimi yaşayın.</p>
+    <button class="enter-btn" id="enter-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polygon points="5 3 19 12 5 21 5 3"/>
+      </svg>
+      Deneyimi Başlat
+    </button>
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-num">360°</div>
+        <div class="stat-label">Görünüm</div>
+      </div>
+      <div class="stat">
+        <div class="stat-num">AR</div>
+        <div class="stat-label">Gerçek Ortam</div>
+      </div>
+      <div class="stat">
+        <div class="stat-num">3D</div>
+        <div class="stat-label">Model</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════
+     VIEWER
+══════════════════════════════ -->
+<div id="viewer-screen">
+
+  <!-- Top bar -->
+  <div class="topbar">
+    <div class="logo-text">AR<span>view</span></div>
+    <div class="topbar-right">
+
+      <!-- ⚙ Settings toggle -->
+      <button id="settings-toggle" title="Ayarlar" aria-label="Ayarlar panelini aç">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
+      </button>
+
+      <button class="back-btn" id="back-btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="15 18 9 12 15 6"/>
+        </svg>
+        Geri
+      </button>
+    </div>
+  </div>
+
+  <!-- ⚙ Settings Panel -->
+  <div id="settings-panel" role="dialog" aria-label="Dosya Ayarları">
+    <div class="panel-header">
+      <div class="panel-header-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+        </svg>
+      </div>
+      <div>
+        <div class="panel-title">Dosya Ayarları</div>
+        <div class="panel-subtitle">Kendi modelini ve sesini yükle</div>
+      </div>
+    </div>
+
+    <!-- GLB Upload -->
+    <div class="upload-row">
+      <div class="upload-label">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+        </svg>
+        3D Model
+      </div>
+      <div class="upload-zone" id="glb-zone">
+        <input type="file" accept=".glb,.gltf" id="glb-input" />
+        <div class="upload-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/>
+            <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/>
+          </svg>
+        </div>
+        <div class="upload-text">
+          <div class="upload-text-main" id="glb-name">Model seç veya sürükle</div>
+          <div class="upload-text-sub">.glb · .gltf</div>
+        </div>
+        <div class="upload-check">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="20 6 9 17 4 12"/>
+          </svg>
+        </div>
+      </div>
+    </div>
+
+    <!-- MP3 Upload -->
+    <div class="upload-row">
+      <div class="upload-label">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+          <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+        </svg>
+        Ses Dosyası
+      </div>
+      <div class="upload-zone" id="mp3-zone">
+        <input type="file" accept=".mp3,.ogg,.wav,.m4a" id="mp3-input" />
+        <div class="upload-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>
+          </svg>
+        </div>
+        <div class="upload-text">
+          <div class="upload-text-main" id="mp3-name">Ses seç veya sürükle</div>
+          <div class="upload-text-sub">.mp3 · .ogg · .wav</div>
+        </div>
+        <div class="upload-check">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="20 6 9 17 4 12"/>
+          </svg>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel-divider"></div>
+
+    <!-- Status chips -->
+    <div class="status-row">
+      <div class="status-chip" id="chip-model">
+        <span class="dot"></span> Model yok
+      </div>
+      <div class="status-chip" id="chip-audio">
+        <span class="dot"></span> Ses yok
+      </div>
+      <div class="status-chip ok">
+        <span class="dot"></span> AR hazır
+      </div>
+    </div>
+  </div>
+
+  <!-- Sound indicator -->
+  <div id="sound-indicator">
+    <div class="pulse"></div>
+    Ses çalıyor
+  </div>
+
+  <!-- Model Viewer -->
+  <model-viewer
+    id="mv"
+    src=""
+    ar
+    ar-modes="webxr scene-viewer quick-look"
+    camera-controls
+    auto-rotate
+    shadow-intensity="1.2"
+    environment-image="neutral"
+    touch-action="pan-y"
+    style="position:absolute;inset:0;width:100%;height:100%;"
+  ></model-viewer>
+
+  <!-- Bottom controls -->
+  <div class="controls">
+    <div class="tip">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+      </svg>
+      Modele tıklayın → ses çalar · Sürükleyin → döndürün
+    </div>
+    <div class="btn-row">
+      <button class="ctrl-btn" id="play-sound-btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+          <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+          <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
+        </svg>
+        Ses Çal
+      </button>
+      <button class="ctrl-btn primary" id="ar-btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+        </svg>
+        AR'da Görüntüle
+      </button>
+    </div>
+  </div>
+</div>
+
+<audio id="ses" preload="auto"></audio>
+
+<script>
+  /* ── refs ── */
+  const landing       = document.getElementById('landing');
+  const viewerScreen  = document.getElementById('viewer-screen');
+  const enterBtn      = document.getElementById('enter-btn');
+  const backBtn       = document.getElementById('back-btn');
+  const mv            = document.getElementById('mv');
+  const audio         = document.getElementById('ses');
+  const playSoundBtn  = document.getElementById('play-sound-btn');
+  const arBtn         = document.getElementById('ar-btn');
+  const soundIndicator= document.getElementById('sound-indicator');
+  const settingsToggle= document.getElementById('settings-toggle');
+  const settingsPanel = document.getElementById('settings-panel');
+  const glbInput      = document.getElementById('glb-input');
+  const mp3Input      = document.getElementById('mp3-input');
+  const glbZone       = document.getElementById('glb-zone');
+  const mp3Zone       = document.getElementById('mp3-zone');
+  const glbName       = document.getElementById('glb-name');
+  const mp3Name       = document.getElementById('mp3-name');
+  const chipModel     = document.getElementById('chip-model');
+  const chipAudio     = document.getElementById('chip-audio');
+
+  let currentGlbURL = null;
+  let currentMp3URL = null;
+
+  /* ── navigation ── */
+  enterBtn.addEventListener('click', () => {
+    landing.classList.add('hidden');
+    viewerScreen.classList.add('visible');
+  });
+
+  backBtn.addEventListener('click', () => {
+    landing.classList.remove('hidden');
+    viewerScreen.classList.remove('visible');
+    audio.pause();
+    soundIndicator.classList.remove('active');
+    settingsPanel.classList.remove('open');
+    settingsToggle.classList.remove('open');
+  });
+
+  /* ── settings panel toggle ── */
+  settingsToggle.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const isOpen = settingsPanel.classList.toggle('open');
+    settingsToggle.classList.toggle('open', isOpen);
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!settingsPanel.contains(e.target) && e.target !== settingsToggle) {
+      settingsPanel.classList.remove('open');
+      settingsToggle.classList.remove('open');
+    }
+  });
+
+  /* ── file helpers ── */
+  function shortName(name, max = 22) {
+    if (name.length <= max) return name;
+    const ext = name.slice(name.lastIndexOf('.'));
+    return name.slice(0, max - ext.length - 1) + '…' + ext;
+  }
+
+  function setChip(chip, text, ok) {
+    chip.textContent = '';
+    const dot = document.createElement('span');
+    dot.className = 'dot';
+    chip.appendChild(dot);
+    chip.appendChild(document.createTextNode(' ' + text));
+    chip.className = 'status-chip' + (ok ? ' ok' : ' warn');
+  }
+
+  /* ── GLB upload ── */
+  glbInput.addEventListener('change', () => {
+    const file = glbInput.files[0];
+    if (!file) return;
+
+    if (currentGlbURL) URL.revokeObjectURL(currentGlbURL);
+    currentGlbURL = URL.createObjectURL(file);
+
+    mv.src = currentGlbURL;
+    glbName.textContent = shortName(file.name);
+    glbZone.classList.add('loaded');
+    setChip(chipModel, shortName(file.name, 16), true);
+  });
+
+  /* ── MP3 upload ── */
+  mp3Input.addEventListener('change', () => {
+    const file = mp3Input.files[0];
+    if (!file) return;
+
+    if (currentMp3URL) URL.revokeObjectURL(currentMp3URL);
+    currentMp3URL = URL.createObjectURL(file);
+
+    audio.src = currentMp3URL;
+    audio.load();
+    mp3Name.textContent = shortName(file.name);
+    mp3Zone.classList.add('loaded');
+    setChip(chipAudio, shortName(file.name, 16), true);
+  });
+
+  /* ── drag & drop support on upload zones ── */
+  [glbZone, mp3Zone].forEach(zone => {
+    zone.addEventListener('dragover', e => {
+      e.preventDefault();
+      zone.style.background = 'rgba(108,94,246,0.12)';
+    });
+    zone.addEventListener('dragleave', () => {
+      zone.style.background = '';
+    });
+    zone.addEventListener('drop', e => {
+      e.preventDefault();
+      zone.style.background = '';
+      const file = e.dataTransfer.files[0];
+      if (!file) return;
+      const isGlb = zone === glbZone;
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      if (isGlb) { glbInput.files = dt.files; glbInput.dispatchEvent(new Event('change')); }
+      else        { mp3Input.files = dt.files; mp3Input.dispatchEvent(new Event('change')); }
+    });
+  });
+
+  /* ── sound ── */
+  function playSound() {
+    if (!audio.src) return;
+    audio.currentTime = 0;
+    audio.play();
+    soundIndicator.classList.add('active');
+    audio.onended = () => soundIndicator.classList.remove('active');
+  }
+
+  mv.addEventListener('click', playSound);
+  playSoundBtn.addEventListener('click', playSound);
+
+  /* ── AR ── */
+  arBtn.addEventListener('click', () => {
+    if (mv.src) mv.activateAR();
+  });
+</script>
+</body>
+</html>
